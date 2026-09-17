@@ -113,3 +113,7 @@ bahria-assignment-notifier/
 ## Credits
 
 Built from scratch for Bahria University Islamabad E-8 Campus. Inspired by [Mujtaba0150/Bahria-University-Automation](https://github.com/Mujtaba0150/Bahria-University-Automation).
+
+## License
+
+MIT
