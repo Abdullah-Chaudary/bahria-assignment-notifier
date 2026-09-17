@@ -1,0 +1,41 @@
+name: Check Assignments
+
+on:
+  schedule:
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-assignments:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Run assignment checker
+        env:
+          ENROLLMENT_NUMBER: ${{ secrets.ENROLLMENT_NUMBER }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+          INSTITUTION: ${{ secrets.INSTITUTION || '6' }}
+          NOTIFICATION_LEVEL: ${{ secrets.NOTIFICATION_LEVEL || '0' }}
+          NOTIFY_EXTENDED: ${{ secrets.NOTIFY_EXTENDED || '1' }}
+        run: python -m src.main
+
+      - name: Save seen assignments cache
+        uses: actions/cache@v4
+        with:
+          path: seen_assignments.json
+          key: seen-assign-${{ github.run_id }}
+          restore-keys: seen-assign-
