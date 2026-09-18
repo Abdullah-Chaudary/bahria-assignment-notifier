@@ -1,6 +1,7 @@
 import sys
 import os
 import argparse
+import requests
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,11 +23,59 @@ from src.notifier import (
     mark_submitted,
     unmark_submitted,
     get_assignment_key,
+    send_notification,
 )
 
 SEEN_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "seen_assignments.json"
 )
+
+MAX_RETRIES = 8
+RETRY_INTERVAL_MINUTES = 15
+
+
+def trigger_retry(run_number: int):
+    if run_number >= MAX_RETRIES:
+        print(f"[RETRY] Max retries ({MAX_RETRIES}) reached. Giving up.")
+        send_notification(
+            "Bot Giving Up",
+            f"Server still down after {MAX_RETRIES} retries ({MAX_RETRIES * RETRY_INTERVAL_MINUTES} minutes). Will try again at next scheduled run.",
+            5,
+        )
+        return
+
+    github_token = os.getenv("GITHUB_TOKEN", "")
+    repo = os.getenv("GITHUB_REPOSITORY", "")
+
+    if not github_token or not repo:
+        print("[RETRY] Not in GitHub Actions or GITHUB_TOKEN not set. Cannot schedule retry.")
+        print(f"[RETRY] Retry {run_number + 1}/{MAX_RETRIES} would run in {RETRY_INTERVAL_MINUTES} minutes.")
+        return
+
+    print(f"[RETRY] Scheduling retry {run_number + 1}/{MAX_RETRIES} in {RETRY_INTERVAL_MINUTES} minutes...")
+
+    try:
+        resp = requests.post(
+            f"https://api.github.com/repos/{repo}/actions/workflows/check-assignments.yml/dispatches",
+            json={
+                "ref": "main",
+                "inputs": {
+                    "retry": str(run_number + 1),
+                },
+            },
+            headers={
+                "Authorization": f"token {github_token}",
+                "Accept": "application/vnd.github.v3+json",
+            },
+            timeout=10,
+        )
+
+        if resp.status_code == 204:
+            print(f"[RETRY] Retry {run_number + 1} scheduled successfully.")
+        else:
+            print(f"[RETRY] Failed to schedule retry: {resp.status_code} {resp.text}")
+    except Exception as e:
+        print(f"[RETRY] Error scheduling retry: {e}")
 
 
 def parse_args():
@@ -44,12 +93,18 @@ def parse_args():
 
     sub.add_parser("submitted", help="List all submitted assignments")
 
+    parser.add_argument("--retry", type=int, default=0, help="Retry attempt number (used internally)")
+
     return parser.parse_args()
 
 
 def do_check():
+    retry_num = int(os.environ.get("RETRY_NUMBER", "0"))
+
     print(f"\n{'='*50}")
     print(f"Bahria Assignment Notifier — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    if retry_num > 0:
+        print(f"Retry attempt: {retry_num}/{MAX_RETRIES}")
     print(f"{'='*50}\n")
 
     errors = config.validate()
@@ -67,14 +122,21 @@ def do_check():
             page.set_default_timeout(60000)
 
             if not login(page):
-                print("[FATAL] Login failed. Exiting.")
-                from src.notifier import send_notification
-                send_notification("Bot Error - Login Failed", "Bahria CMS/LMS server is down or unreachable. Could not check assignments.", 5)
+                print("[FATAL] Login failed.")
+                send_notification("Bot Error - Login Failed", "Bahria CMS/LMS server is down. Retrying in 15 minutes...", 5)
                 browser.close()
+                trigger_retry(retry_num)
                 sys.exit(1)
 
             deadlines = fetch_assignments(page)
             browser.close()
+
+        if retry_num > 0:
+            send_notification(
+                "Bot Back Online",
+                f"Server is back! Checked successfully after {retry_num} retry attempt(s).",
+                3,
+            )
 
         if not deadlines:
             print("\n[RESULT] No active assignments found.")
@@ -106,8 +168,8 @@ def do_check():
 
     except Exception as e:
         print(f"\n[FATAL] Error: {e}")
-        from src.notifier import send_notification
         send_notification("Bot Error", f"Something went wrong: {str(e)[:200]}", 5)
+        trigger_retry(retry_num)
         sys.exit(1)
 
 

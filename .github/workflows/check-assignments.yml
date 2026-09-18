@@ -4,11 +4,16 @@ on:
   schedule:
     - cron: '0 */3 * * *'
   workflow_dispatch:
+    inputs:
+      retry:
+        description: 'Retry attempt number'
+        required: false
+        default: '0'
 
 jobs:
   check-assignments:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +28,12 @@ jobs:
           pip install -r requirements.txt
           playwright install --with-deps chromium
 
+      - name: Wait before retry
+        if: ${{ github.event.inputs.retry != '0' && github.event.inputs.retry != '' }}
+        run: |
+          echo "Retry attempt ${{ github.event.inputs.retry }}. Waiting 15 minutes..."
+          sleep 900
+
       - name: Run assignment checker
         env:
           ENROLLMENT_NUMBER: ${{ secrets.ENROLLMENT_NUMBER }}
@@ -31,7 +42,9 @@ jobs:
           INSTITUTION: ${{ secrets.INSTITUTION || '6' }}
           NOTIFICATION_LEVEL: ${{ secrets.NOTIFICATION_LEVEL || '0' }}
           NOTIFY_EXTENDED: ${{ secrets.NOTIFY_EXTENDED || '1' }}
-        run: python -m src.main
+          RETRY_NUMBER: ${{ github.event.inputs.retry || '0' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python -m src.main check
 
       - name: Save seen assignments cache
         uses: actions/cache@v4
