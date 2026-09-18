@@ -68,6 +68,8 @@ def do_check():
 
             if not login(page):
                 print("[FATAL] Login failed. Exiting.")
+                from src.notifier import send_notification
+                send_notification("Bot Error - Login Failed", "Bahria CMS/LMS server is down or unreachable. Could not check assignments.", 5)
                 browser.close()
                 sys.exit(1)
 
@@ -105,7 +107,7 @@ def do_check():
     except Exception as e:
         print(f"\n[FATAL] Error: {e}")
         from src.notifier import send_notification
-        send_notification("Assignment Bot Error", f"Error: {str(e)}", 5)
+        send_notification("Bot Error", f"Something went wrong: {str(e)[:200]}", 5)
         sys.exit(1)
 
 
