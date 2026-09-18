@@ -70,23 +70,23 @@ def send_notification(title: str, message: str, priority: int):
 
 def _urgency_emoji(days_left: int) -> str:
     if days_left == 0:
-        return "[!!!]"
+        return "🔴"
     elif days_left <= 2:
-        return "[!!]"
+        return "🟠"
     elif days_left <= 4:
-        return "[!]"
+        return "🟡"
     elif days_left <= 7:
-        return "[-]"
+        return "🟢"
     else:
-        return "[ ]"
+        return "⚪"
 
 
-def _status_icon(submitted: bool, extended: bool) -> str:
+def _status_emoji(submitted: bool, extended: bool) -> str:
     if submitted:
-        return "[DONE]"
+        return "✅"
     if extended:
-        return "[EXT]"
-    return "[....]"
+        return "🔄"
+    return "⏳"
 
 
 def alert_deadlines(deadlines: list[dict]):
@@ -114,8 +114,8 @@ def alert_deadlines(deadlines: list[dict]):
         key = get_assignment_key(dl)
         submitted = dl["submitted"] or is_submitted(key)
         display_date = dl["deadline_date"].strftime("%d %B")
-        urgency = _urgency_emoji(days_left)
-        status = _status_icon(submitted, dl["extended"])
+        emoji = _urgency_emoji(days_left)
+        status = _status_emoji(submitted, dl["extended"])
 
         if days_left == 0:
             days_str = "TODAY"
@@ -125,15 +125,16 @@ def alert_deadlines(deadlines: list[dict]):
             days_str = f"{days_left} days left"
 
         msg = (
-            f"{urgency} {dl['subject']}\n"
-            f"     {dl['assignment_name']}\n"
-            f"     Due: {display_date} | {days_str}\n"
-            f"     Status: {status}"
+            f"{emoji} {dl['subject']}\n"
+            f"📝 {dl['assignment_name']}\n"
+            f"📅 Due: {display_date}\n"
+            f"⏳ {days_str}\n"
+            f"📊 Status: {status} {'Submitted' if submitted else 'Pending'}"
         )
 
         if days_left == 0:
             priority = 5
-            title = "ASSIGNMENT DUE TODAY"
+            title = "Assignment Due TODAY"
         elif days_left <= 2:
             priority = 5
             title = f"URGENT - {days_left} day(s) left"
@@ -160,12 +161,12 @@ def alert_new_assignments(new_assignments: list[dict]):
     for dl in sorted(new_assignments, key=lambda x: x["deadline_date"]):
         days_left = (dl["deadline_date"] - today).days
         display_date = dl["deadline_date"].strftime("%d %b")
-        urgency = _urgency_emoji(days_left)
+        emoji = _urgency_emoji(days_left)
 
         lines.append(
-            f"{urgency} NEW >> {dl['subject']}\n"
-            f"         {dl['assignment_name']}\n"
-            f"         Due: {display_date} ({days_left}d left)"
+            f"{emoji} NEW — {dl['subject']}\n"
+            f"📝 {dl['assignment_name']}\n"
+            f"📅 {display_date} ({days_left}d left)"
         )
 
     combined = "\n\n".join(lines)
@@ -192,30 +193,30 @@ def send_summary(deadlines: list[dict]):
     urgent = [dl for dl in pending if (dl["deadline_date"] - today).days <= 3]
     upcoming = [dl for dl in pending if (dl["deadline_date"] - today).days > 3]
 
-    summary = f"ASSIGNMENT SUMMARY\n\n"
+    summary = "📊 ASSIGNMENT SUMMARY\n\n"
 
     if urgent:
-        summary += f"--- URGENT (<=3 days) ---\n"
+        summary += "🔴 URGENT (≤3 days):\n"
         for dl in sorted(urgent, key=lambda x: x["deadline_date"]):
             days_left = (dl["deadline_date"] - today).days
             display_date = dl["deadline_date"].strftime("%d %b")
             summary += (
-                f"  {dl['subject']}\n"
+                f"  • {dl['subject']}\n"
                 f"    {dl['assignment_name']}\n"
-                f"    Due: {display_date} ({days_left}d left)\n\n"
+                f"    📅 {display_date} ({days_left}d left)\n\n"
             )
 
     if upcoming:
-        summary += f"--- UPCOMING (>3 days) ---\n"
+        summary += "🟢 UPCOMING (>3 days):\n"
         for dl in sorted(upcoming, key=lambda x: x["deadline_date"]):
             days_left = (dl["deadline_date"] - today).days
             display_date = dl["deadline_date"].strftime("%d %b")
             summary += (
-                f"  {dl['subject']}\n"
+                f"  • {dl['subject']}\n"
                 f"    {dl['assignment_name']}\n"
-                f"    Due: {display_date} ({days_left}d left)\n\n"
+                f"    📅 {display_date} ({days_left}d left)\n\n"
             )
 
-    summary += f"Total: {len(deadlines)} | Pending: {len(pending)} | Done: {submitted_count}"
+    summary += f"📋 Total: {len(deadlines)} | ⏳ Pending: {len(pending)} | ✅ Done: {submitted_count}"
 
     send_notification("Assignment Summary", summary, 3)
