@@ -62,7 +62,20 @@ NOTIFY_EXTENDED=1
 ### 4. Run Locally
 
 ```bash
-python -m src.main
+# Check assignments and send notifications
+python -m src.main check
+
+# Send a summary of all assignments
+python -m src.main summary
+
+# Mark an assignment as submitted (stops notifications for it)
+python -m src.main submit "Data Structures"
+
+# Unmark a submitted assignment
+python -m src.main unsubmit "Data Structures"
+
+# List all submitted assignments
+python -m src.main submitted
 ```
 
 ### 5. GitHub Actions (Auto-run every 3 hours)
@@ -91,6 +104,24 @@ You can also trigger it manually from the **Actions** tab.
 | 8+ days | 2 (low) | Future assignment |
 
 The bot tracks which assignments it has already notified you about (stored in `seen_assignments.json`) so you only get notified about **new** assignments once, plus deadline reminders as they approach.
+
+## Tracking Submitted Assignments
+
+Use the `submit` command to mark assignments you've already submitted. The bot will stop sending deadline notifications for them:
+
+```bash
+# Find and mark assignments
+python -m src.main submit "Data Structures"
+python -m src.main submit "Assignment 1"
+
+# List what's marked as submitted
+python -m src.main submitted
+
+# Undo if you made a mistake
+python -m src.main unsubmit "Data Structures"
+```
+
+Submitted assignments are stored in `submitted.json` and excluded from notifications.
 
 ## Project Structure
 
