@@ -14,6 +14,7 @@ from src.scraper import (
     load_seen_assignments,
     save_seen_assignments,
     detect_new_assignments,
+    check_and_upload_emergency,
 )
 from src.notifier import (
     alert_deadlines,
@@ -84,6 +85,7 @@ def parse_args():
 
     sub.add_parser("check", help="Check assignments and send notifications")
     sub.add_parser("summary", help="Send a summary of all assignments")
+    sub.add_parser("emergency-upload", help="Upload blank files for assignments due within 3 minutes")
 
     sub_add = sub.add_parser("submit", help="Mark an assignment as submitted")
     sub_add.add_argument("pattern", help="Search pattern (subject or assignment name)")
@@ -364,6 +366,58 @@ def do_list_submitted():
     print()
 
 
+def do_emergency_upload():
+    print(f"\n{'='*50}")
+    print(f"Emergency Upload Check — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"{'='*50}\n")
+
+    errors = config.validate()
+    if errors:
+        for e in errors:
+            print(f"[CONFIG ERROR] {e}")
+        sys.exit(1)
+
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            browser = create_browser(p)
+            page = browser.new_page()
+            page.set_default_timeout(60000)
+
+            if not login(page):
+                print("[FATAL] Login failed.")
+                send_notification("Emergency Upload Failed", "Server down. Could not check for emergency uploads.", 5)
+                browser.close()
+                sys.exit(1)
+
+            uploaded = check_and_upload_emergency(page)
+            browser.close()
+
+        if uploaded:
+            messages = []
+            for item in uploaded:
+                messages.append(
+                    f" Uploaded blank file for:\n"
+                    f" {item['subject']} - {item['assignment_name']}\n"
+                    f" Deadline was in {item['minutes_remaining']} minutes\n"
+                )
+            combined = "\n".join(messages)
+            send_notification(
+                f"Emergency Upload Complete ({len(uploaded)} file(s))",
+                combined,
+                5,
+            )
+            print(f"\n[DONE] Uploaded {len(uploaded)} blank file(s).")
+        else:
+            print("\n[RESULT] No assignments due for emergency upload.")
+
+    except Exception as e:
+        print(f"\n[FATAL] Error: {e}")
+        send_notification("Emergency Upload Error", f"Error: {str(e)[:200]}", 5)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     args = parse_args()
 
@@ -375,5 +429,7 @@ if __name__ == "__main__":
         do_list_submitted()
     elif args.command == "summary":
         do_summary()
+    elif args.command == "emergency-upload":
+        do_emergency_upload()
     else:
         do_check()

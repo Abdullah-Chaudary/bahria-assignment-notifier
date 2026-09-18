@@ -1,0 +1,32 @@
+name: Emergency Upload
+
+on:
+  schedule:
+    - cron: '57 18 * * *'
+  workflow_dispatch:
+
+jobs:
+  emergency-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Run emergency upload check
+        env:
+          ENROLLMENT_NUMBER: ${{ secrets.ENROLLMENT_NUMBER }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+          INSTITUTION: ${{ secrets.INSTITUTION || '6' }}
+        run: python -m src.main emergency-upload
