@@ -1,4 +1,5 @@
 .env
+seen_assignments.json
 __pycache__/
 *.pyc
 error_logs/
