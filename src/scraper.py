@@ -61,7 +61,7 @@ def login(page: Page) -> bool:
         print(f"[LOGIN] Attempt {attempt}/{MAX_RETRIES} - Navigating to CMS login...")
 
         try:
-            resp = page.goto(config.CMS_URL, wait_until="commit", timeout=30000)
+            resp = page.goto(config.CMS_URL, wait_until="networkidle", timeout=30000)
 
             if resp and resp.status >= 500:
                 print(f"[ERROR] Server returned {resp.status}. Retrying in {RETRY_DELAY}s...")
@@ -78,10 +78,12 @@ def login(page: Page) -> bool:
 
             page.fill("#BodyPH_tbEnrollment", config.ENROLLMENT_NUMBER)
             page.fill("#BodyPH_tbPassword", config.PASSWORD)
+
+            # Institute dropdown - Islamabad E-8 Campus is value "1"
             page.select_option("#BodyPH_ddlInstituteID", "1")
 
-            campus_selector = f"#pageContent > div.container-fluid > div.row > div > div:nth-child({config.INSTITUTION})"
-            page.click(campus_selector)
+            # New sub-user type dropdown - must select "Student"
+            page.select_option("#BodyPH_ddlSubUserType", "None")
 
             page.click("#BodyPH_btnLogin")
             print(f"[LOGIN] Logged in as {config.ENROLLMENT_NUMBER}")
